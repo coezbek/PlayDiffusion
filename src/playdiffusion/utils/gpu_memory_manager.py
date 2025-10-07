@@ -20,7 +20,8 @@ class GPUMemoryManager:
         self.fragmentation_threshold = 0.7
         self.segment_count_threshold = 350
 
-        self.last_cleanup_time = time.perf_counter()
+        self.min_check_interval = 60 # Minimum interval to check fragmentation
+        self.last_check_time = self.last_cleanup_time = time.perf_counter()
         self.second_until_gc = 20 * 60 # 20 minutes until next GC
         self.lock = threading.Lock()
 
@@ -36,8 +37,9 @@ class GPUMemoryManager:
             if reserved_bytes > 0:
                 ratio = 1.0 - (allocated_bytes / reserved_bytes)
 
-            print(f"Memory fragmentation metrics - Ratio: {ratio:.4f}, "
-                f"Segments: {segment_count}")
+            if ratio > self.fragmentation_threshold * 0.75 or segment_count > self.segment_count_threshold * 0.75:
+                print(f"Memory fragmentation metrics - Ratio: {ratio:.4f}, "
+                    f"Segments: {segment_count}")
 
             # Condition 1: Fragmentation ratio exceeds threshold
             if ratio > self.fragmentation_threshold:
@@ -70,13 +72,16 @@ class GPUMemoryManager:
         threshold = self.threshold_percent
         min_interval = self.min_interval_seconds
         max_interval = self.max_interval_seconds
-
+        
         try:
             with self.lock:
                 current_time = time.perf_counter()
                 time_since_last_cleanup = current_time - self.last_cleanup_time
-                if time_since_last_cleanup < min_interval:
+
+                if time_since_last_cleanup < min_interval or (current_time - self.last_check_time) < self.min_check_interval:
                     return None, None, None
+                
+                self.last_check_time = current_time
 
                 device = torch.cuda.current_device()
                 free, total = torch.cuda.mem_get_info(device)
