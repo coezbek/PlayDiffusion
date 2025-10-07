@@ -175,14 +175,14 @@ class PlayDiffusion():
             else:
                 speech_time += word["end"] - word["start"] + self.break_spacing_time
             last_word_end = word["end"]
-        print(f"Speech time: {speech_time}")
+        print(f"Speech time: {speech_time:.2f} s")
         n_syllables = syllables.estimate(" ".join(words_with_times))
         print(f"Number of syllables: {n_syllables}")
         if n_syllables == 0:
             audio_token_syllable_ratio = self.default_audio_token_syllable_ratio
         else:
             audio_token_syllable_ratio = speech_time * self.frame_rate / n_syllables
-        print(f"Audio token to syllable ratio: {audio_token_syllable_ratio}")
+        print(f"Audio token to syllable ratio: {audio_token_syllable_ratio:.1f}")
         return audio_token_syllable_ratio
 
     def calculate_diff_words(self, text_align, word_times: List[Dict], input_audio_tokens):
