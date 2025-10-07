@@ -2,10 +2,8 @@ import warnings
 from typing import List, Optional, Tuple, Union
 
 import torch
-from fairseq2.data import Collater
-from fairseq2.models.sequence import SequenceBatch
-from fairseq2.nn.padding import PaddingMask, get_seqs_and_padding_mask
-from fairseq2.typing import DataType, Device
+from fairseq2.nn import BatchLayout
+from torch.nn.utils.rnn import pad_sequence
 
 from playdiffusion.models.speech_tokenizer.kmeans import KmeansModel
 from playdiffusion.models.speech_tokenizer.xlsr_encoder import load_xlsr_encoder
@@ -32,8 +30,8 @@ class SpeechEncoder(torch.nn.Module):
         self,
         checkpoint: Union[str, None] = "data/checkpoints/xlsr2_1b_v2_custom.pt",
         max_layer: Union[int, None] = 35,
-        device: Optional[Device] = None,
-        dtype: DataType = torch.float32,
+        device: Optional[torch.device] = None,
+        dtype: torch.dtype = torch.float32,
         strict: bool = False,
         eval: bool = True,
     ) -> None:
@@ -81,17 +79,20 @@ class SpeechEncoder(torch.nn.Module):
         return next(self.parameters()).dtype
 
     @torch.inference_mode()
-    def forward(self, batch: SequenceBatch) -> Tuple[torch.Tensor, PaddingMask]:
+    # The forward signature now accepts the padded sequences and the batch layout
+    def forward(self, seqs: torch.Tensor, layout: BatchLayout) -> torch.Tensor:
         """
         Minimal re-implementation that assumes we only loaded `max_layer` layers.
         This is better as it doesn't require the full model to be loaded.
 
-        :param batch:
-            The batch of sequences to process.
+        :param seqs:
+            The batch of padded sequences.
+        :param layout:
+            The layout of the batch (containing sequence lengths).
         """
-        seqs, padding_mask = self.model.encoder_frontend(batch.seqs, batch.padding_mask)
-        encoder_output, padding_mask = self.model.encoder(seqs, padding_mask)
-        return encoder_output, padding_mask
+        seqs, layout = self.model.encoder_frontend(seqs, layout)
+        encoder_output = self.model.encoder(seqs, layout)
+        return encoder_output
 
 
 class SpeechTokenizer(torch.nn.Module):
@@ -111,11 +112,10 @@ class SpeechTokenizer(torch.nn.Module):
         self,
         checkpoint: Union[str, None] = "data/checkpoints/xlsr2_1b_v2_custom.pt",
         kmeans_layer_checkpoint: str = "data/checkpoints/kmeans_10k.npy",
-        dtype: DataType = torch.float16,
-        device: Optional[Device] = None,
+        dtype: torch.dtype = torch.float16,
+        device: Optional[torch.device] = None,
     ) -> None:
         super().__init__()
-        self.collater = Collater(pad_value=1, pad_to_multiple=2)
 
         if device is None:
             device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
@@ -134,25 +134,37 @@ class SpeechTokenizer(torch.nn.Module):
     def dtype(self):
         return next(self.parameters()).dtype
 
-    def create_batch(self, x: BATCH_INPUT) -> SequenceBatch:
-        src = self.collater(x)
-        seqs, padding_mask = get_seqs_and_padding_mask(src)
-        batch = SequenceBatch(seqs=seqs, padding_mask=padding_mask)
-        return batch
+    def create_batch(self, x: BATCH_INPUT) -> Tuple[torch.Tensor, BatchLayout]:
+        if isinstance(x, torch.Tensor):
+            x = [x]
+        
+        lens: List[int] = [int(t.shape[0]) for t in x]
+        # Original code padded with 1, but for an audio model 0 makes more sense
+        seqs = pad_sequence(x, batch_first=True, padding_value=0.0)
+        seqs = seqs.to(self.device, self.dtype)
+
+        B, T_max = int(seqs.size(0)), int(seqs.size(1))
+        layout = BatchLayout(shape=(B, T_max), seq_lens=lens, device=seqs.device)
+        return seqs, layout
 
     @torch.inference_mode()
-    def forward(self, batch: SequenceBatch) -> Tuple[torch.Tensor, PaddingMask]:
-        self.cuda_stream.wait_stream(torch.cuda.current_stream())
-        with torch.cuda.stream(self.cuda_stream):
-            z, padding_mask = self.encoder(batch)
+    def forward(self, seqs: torch.Tensor, layout: BatchLayout) -> torch.Tensor:
+        
+        units = None
+        if torch.cuda.is_available():
+            self.cuda_stream.wait_stream(torch.cuda.current_stream())
+            with torch.cuda.stream(self.cuda_stream):
+                z = self.encoder(seqs, layout)
+                units = self.kmeans(z)
+                self.gpu_memory_manager.check_and_cleanup()
+            torch.cuda.current_stream().wait_stream(self.cuda_stream)
+        else:
+            z = self.encoder(seqs, layout)
             units = self.kmeans(z)
-            self.gpu_memory_manager.check_and_cleanup()
-        torch.cuda.current_stream().wait_stream(self.cuda_stream)
-        return units, padding_mask
+        return units
 
     @torch.inference_mode()
     def waveform_to_units(self, waveform: torch.Tensor) -> torch.Tensor:
-        waveform = waveform.to(self.device).to(self.dtype)
-        batch = self.create_batch(waveform)
-        units, _ = self(batch)
+        seqs, layout = self.create_batch(waveform)
+        units = self(seqs, layout)
         return units
