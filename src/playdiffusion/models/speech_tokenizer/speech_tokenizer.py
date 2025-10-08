@@ -15,7 +15,7 @@ BATCH_INPUT = Union[torch.Tensor, List[torch.Tensor], Tuple[torch.Tensor, ...]]
 # Disable "weight_norm" deprecation wanring for loading the Wav2Vec Model
 warnings.filterwarnings(
     "ignore",
-    message="torch.nn.utils.weight_norm is deprecated in favor of torch.nn.utils.parametrizations.weight_norm.",
+    message=".*torch.nn.utils.weight_norm`* is deprecated.*",
 )
 
 class SpeechEncoder(torch.nn.Module):

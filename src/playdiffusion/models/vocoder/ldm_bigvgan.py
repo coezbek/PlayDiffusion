@@ -2,6 +2,13 @@ from __future__ import annotations
 
 import math
 import time
+import warnings
+
+# Disable "weight_norm" deprecation wanring for loading the BigVGAN model
+warnings.filterwarnings(
+    "ignore",
+    message="torch.nn.utils.weight_norm`* is deprecated",
+)
 
 import torch
 import torch.nn as nn
