@@ -1,5 +1,8 @@
 import time
 import torch
+import logging
+
+logger = logging.getLogger(__name__)
 
 def load_audio_from_file(file_name: str):
     import soundfile as sf
@@ -60,7 +63,7 @@ def get_vocoder_embedding(voice_name: str, mm):
     try:
         voice_resource = VoiceResource.load(voice_name)
     except Exception:
-        print("Failed to load voice resource")
+        logger.error("Failed to load voice resource")
         raise
 
     _, vocoder_emb = voice_emb_util.get_voice_embeddings(mm, voice_resource)
@@ -77,7 +80,7 @@ def load_audio(audio_path: str, device):
     raw_audio = load_audio_from_file(local_audio_path)
     sr, torch_audio = raw_audio_to_torch_audio(raw_audio)
     torch_audio = torch_audio.to(device)
-    print(
+    logger.info(
         f"Got raw audio: duration {torch_audio.shape[-1] / sr:.3f} s \
             ({sr} Hz, {torch_audio.shape} samples)"
     )
@@ -95,11 +98,11 @@ class Timer:
 
     def __call__(self, description: str):
         if description in self.times:
-            print(f"Already timed {description}")
+            logger.debug(f"Already timed {description}")
             return
         new_time = time.time()
         self.times[description] = 1000 * (new_time - self.previous_time)
-        print(f"{description} time: {self.times[description]:.1f} ms")
+        logger.debug(f"{description} time: {self.times[description]:.1f} ms")
         self.previous_time = new_time
 
     def get_times(self):

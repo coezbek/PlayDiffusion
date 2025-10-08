@@ -10,6 +10,9 @@ warnings.filterwarnings(
     message="torch.nn.utils.weight_norm`* is deprecated",
 )
 
+import logging
+logger = logging.getLogger(__name__)
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -540,7 +543,7 @@ class Upsampler_mrf(nn.Module):
         return x
 
     def remove_weight_norm(self):
-        print('Removing weight norm...')
+        logger.debug('Removing weight norm...')
         for l in self.ups:
             remove_weight_norm(l)
         for l in self.resblocks:
@@ -783,7 +786,7 @@ class BigVGAN(torch.nn.Module):
         return x
 
     def remove_weight_norm(self):
-        print('Removing weight norm...')
+        logger.debug('Removing weight norm...')
         for l in self.ups:
             for l_i in l:
                 remove_weight_norm(l_i)
@@ -815,7 +818,7 @@ class BigVGAN(torch.nn.Module):
         if voice_emb.ndim == 3:
             voice_emb = voice_emb.squeeze(1)
         res = self.forward(ar_h, voice_emb)
-        print(f"Vocoder time: {(time.perf_counter() - t_start) * 1000:.1f} ms")
+        logger.debug(f"Vocoder time: {(time.perf_counter() - t_start) * 1000:.1f} ms")
         return res
 
     @property

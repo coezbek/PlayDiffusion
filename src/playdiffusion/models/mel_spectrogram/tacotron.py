@@ -1,3 +1,7 @@
+import logging
+
+logger = logging.getLogger(__name__)
+
 import torch
 import torch.nn.functional as F
 from torch.autograd import Variable
@@ -202,7 +206,7 @@ class TacotronSTFT(torch.nn.Module):
 
         # Handle inf and nan values in magnitudes
         if torch.isinf(magnitudes).any() or torch.isnan(magnitudes).any():
-            print("Warning: Inf or NaN values found in magnitudes")
+            logger.warning("Warning: Inf or NaN values found in magnitudes")
             max_magnitude = torch.finfo(magnitudes.dtype).max
             magnitudes = torch.nan_to_num(magnitudes, nan=0.0, posinf=max_magnitude, neginf=0.0)
 

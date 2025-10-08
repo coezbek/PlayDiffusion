@@ -3,6 +3,9 @@ import gc
 import torch
 import asyncio
 import threading
+import logging
+
+logger = logging.getLogger(__name__)
 
 class GPUMemoryManager:
     def __init__(self, threshold_percent, min_interval_seconds):
@@ -37,22 +40,21 @@ class GPUMemoryManager:
             if reserved_bytes > 0:
                 ratio = 1.0 - (allocated_bytes / reserved_bytes)
 
-            if ratio > self.fragmentation_threshold * 0.75 or segment_count > self.segment_count_threshold * 0.75:
-                print(f"Memory fragmentation metrics - Ratio: {ratio:.4f}, "
-                    f"Segments: {segment_count}")
+            logger.debug(f"Memory fragmentation metrics - Ratio: {ratio:.4f}, "
+                f"Segments: {segment_count}")
 
             # Condition 1: Fragmentation ratio exceeds threshold
             if ratio > self.fragmentation_threshold:
-                print(f"Fragmentation: {ratio:.4f} > {self.fragmentation_threshold}")
+                logger.debug(f"Fragmentation: {ratio:.4f} > {self.fragmentation_threshold}")
                 return True
             # Condition 2: Excessive memory segments
             elif segment_count > self.segment_count_threshold and ratio > 0.5:
-                print(f"Excessive segments: {segment_count} > {self.segment_count_threshold}")
+                logger.debug(f"Excessive segments: {segment_count} > {self.segment_count_threshold}")
                 return True
 
             return False
         except Exception as e:
-            print(f"Error checking fragmentation: {e}")
+            logger.error(f"Error checking fragmentation: {e}")
             return False
 
     def defragment_memory(self, free):
@@ -63,9 +65,9 @@ class GPUMemoryManager:
                 temp_tensor = torch.empty(tensor_size, dtype=torch.uint8, device=torch.cuda.current_device())
                 del temp_tensor
                 torch.cuda.empty_cache()
-                print("Performed memory defragmentation")
+                logger.info("Performed memory defragmentation")
         except Exception as e:
-            print(f"Error in defragmentation: {e}")
+            logger.error(f"Error in defragmentation: {e}")
 
 
     def check_and_cleanup(self):
@@ -91,11 +93,11 @@ class GPUMemoryManager:
                 should_cleanup = percent > threshold or self.is_memory_fragmented() or time_since_last_cleanup > max_interval
                 if should_cleanup:
                     if percent > threshold:
-                        print(f"GPU mem({percent:.2f}%) > ({threshold}%). Performing cleanup...")
+                        logger.debug(f"GPU mem({percent:.2f}%) > ({threshold}%). Performing cleanup...")
                     elif time_since_last_cleanup > max_interval:
-                        print(f"Interval ({time_since_last_cleanup:.2f}s) > ({max_interval}s). Performing cleanup...")
+                        logger.debug(f"Interval ({time_since_last_cleanup:.2f}s) > ({max_interval}s). Performing cleanup...")
                     else:
-                        print(f"Fragmentation detected. Performing cleanup...")
+                        logger.debug(f"Fragmentation detected. Performing cleanup...")
 
                     # Update timestamp before cleanup to prevent other threads from starting cleanup
                     self.last_cleanup_time = current_time
@@ -112,17 +114,17 @@ class GPUMemoryManager:
                 free, total = torch.cuda.mem_get_info(device)
 
                 if self.is_memory_fragmented():
-                    print("Memory fragmentation after cleanup detected.")
+                    logger.debug("Memory fragmentation after cleanup detected.")
                     self.defragment_memory(free)
 
                 percent = 100 - (free / total) * 100
-                print(f"GPU mem after cleanup: {percent:.2f}%, {(total - free) / (1024 ** 3):.2f}GB / {total / (1024 ** 3):.2f}GB")
+                logger.info(f"GPU mem after cleanup: {percent:.2f}%, {(total - free) / (1024 ** 3):.2f}GB / {total / (1024 ** 3):.2f}GB")
             else:
-                print(f"GPU mem: {percent:.2f}% <= ({threshold}%), {(total - free) / (1024 ** 3):.2f}GB / {total / (1024 ** 3):.2f}GB")
+                logger.info(f"GPU mem: {percent:.2f}% <= ({threshold}%), {(total - free) / (1024 ** 3):.2f}GB / {total / (1024 ** 3):.2f}GB")
 
             return percent, (total - free) / (1024 ** 3), total / (1024 ** 3)
         except Exception as e:
-            print(f"Error in GPU memory check: {e}")
+            logger.error(f"Error in GPU memory check: {e}")
             return None, None, None
 
     async def async_check_and_cleanup(self):

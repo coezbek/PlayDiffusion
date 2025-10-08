@@ -1,3 +1,8 @@
+import logging
+logging.basicConfig(level=logging.INFO, format='[%(levelname)s] %(message)s')
+logging.getLogger('playdiffusion').setLevel(logging.WARNING)
+logging.getLogger('playdiffusion.inference').setLevel(logging.INFO)
+
 import argparse
 import os
 from pathlib import Path

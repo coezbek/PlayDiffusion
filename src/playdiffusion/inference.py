@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+import logging
 from typing import Dict, List, Optional
 
 from playdiffusion.models.model_manager import PlayDiffusionModelManager
@@ -6,6 +7,7 @@ from playdiffusion.pydantic_models.models import InpaintInput, TTSInput, RVCInpu
 from playdiffusion.utils.audio_utils import Timer, get_vocoder_embedding, load_audio
 from playdiffusion.utils.save_audio import make_16bit_pcm
 
+logger = logging.getLogger(__name__)
 
 @dataclass
 class TextDiffChunk:
@@ -119,7 +121,7 @@ class PlayDiffusion():
         import jiwer
 
         input_text = ''.join([c for c in input_text if c.isalnum() or c.isspace() or c == "'" or c == "-"])
-        print(f"Text for word times alignment: {input_text}")
+        logger.debug(f"Text for word times alignment: {input_text}")
 
         if not isinstance(input_word_times, list):
             raise ValueError("input_word_times must be a list")
@@ -158,9 +160,9 @@ class PlayDiffusion():
         for i in range(last_hyp_index, len(word_times)):
             word_times_mod.append(word_times[i])
 
-        print("Word times (added missing words):")
+        logger.debug("Word times (added missing words):")
         for i, word in enumerate(word_times_mod):
-            print(f"    {i}: {word}")
+            logger.debug(f"    {i}: {word}")
 
         assert len(word_times_mod) == len(word_times_align.references[0])
 
@@ -185,21 +187,21 @@ class PlayDiffusion():
             else:
                 speech_time += word["end"] - word["start"] + self.break_spacing_time
             last_word_end = word["end"]
-        print(f"Speech time: {speech_time:.2f} s")
+        logger.debug(f"Speech time: {speech_time:.2f} s")
         n_syllables = syllables.estimate(" ".join(words_with_times))
-        print(f"Number of syllables: {n_syllables}")
+        logger.debug(f"Number of syllables: {n_syllables}")
         if n_syllables == 0:
             audio_token_syllable_ratio = self.default_audio_token_syllable_ratio
         else:
             audio_token_syllable_ratio = speech_time * self.frame_rate / n_syllables
-        print(f"Audio token to syllable ratio: {audio_token_syllable_ratio:.1f}")
+        logger.debug(f"Audio token to syllable ratio: {audio_token_syllable_ratio:.1f}")
         return audio_token_syllable_ratio
 
     def calculate_diff_words(self, text_align, word_times: List[Dict], input_audio_tokens):
         merged_chunks = []  # type: ignore
         last_chunk_end = None
         for chunk in text_align.alignments[0]:
-            print(chunk)
+            logger.debug(chunk)
             if chunk.type != "equal":
                 ref_start = chunk.ref_start_idx
                 hyp_start = chunk.hyp_start_idx
@@ -305,20 +307,20 @@ class PlayDiffusion():
                     merged_chunks[-1].hyp_end = hyp_end
                     merged_chunks[-1].hyp_buf_end = hyp_buf_end
                     merged_chunks[-1].ref_diff_end = ref_diff_end
-                    print("Merged with previous chunk")
-                    print(
+                    logger.debug("Merged with previous chunk")
+                    logger.debug(
                         f"Ref text: \
                             {text_align.references[0][merged_chunks[-1].ref_start:merged_chunks[-1].ref_end]}"
                     )
-                    print(
+                    logger.debug(
                         f"Hyp text: \
                             {text_align.hypotheses[0][merged_chunks[-1].hyp_start:merged_chunks[-1].hyp_end]}"
                     )
-                    print(
+                    logger.debug(
                         f"Ref text (buffered): \
                             {text_align.references[0][merged_chunks[-1].ref_buf_start:merged_chunks[-1].ref_buf_end]}"
                     )
-                    print(
+                    logger.debug(
                         f"Hyp text (buffered): \
                             {text_align.hypotheses[0][merged_chunks[-1].hyp_buf_start:merged_chunks[-1].hyp_buf_end]}"
                     )
@@ -335,20 +337,20 @@ class PlayDiffusion():
                         ref_diff_start=ref_diff_start,
                         ref_diff_end=ref_diff_end,
                     )
-                    print("Added new chunk")
-                    print(
+                    logger.debug("Added new chunk")
+                    logger.debug(
                         f"Ref text: \
                             {text_align.references[0][diff_chunk.ref_start:diff_chunk.ref_end]}"
                     )
-                    print(
+                    logger.debug(
                         f"Hyp text: \
                             {text_align.hypotheses[0][diff_chunk.hyp_start:diff_chunk.hyp_end]}"
                     )
-                    print(
+                    logger.debug(
                         f"Ref text (buffered): \
                             {text_align.references[0][diff_chunk.ref_buf_start:diff_chunk.ref_buf_end]}"
                     )
-                    print(
+                    logger.debug(
                         f"Hyp text (buffered): \
                             {text_align.hypotheses[0][diff_chunk.hyp_buf_start:diff_chunk.hyp_buf_end]}"
                     )
@@ -494,24 +496,24 @@ class PlayDiffusion():
             # keep track of the text at each step, to tokenize and pass to the inpainter
             ref_text = text_align.references[0][ref_start:ref_end]
             hyp_text = text_align.hypotheses[0][hyp_start:hyp_end]
-            print(f"Ref text: {ref_text}")
-            print(f"Hyp text: {hyp_text}")
+            logger.debug(f"Ref text: {ref_text}")
+            logger.debug(f"Hyp text: {hyp_text}")
             ref_text_buf = text_align.references[0][ref_buf_start:ref_buf_end]
             hyp_text_buf = text_align.hypotheses[0][hyp_buf_start:hyp_buf_end]
-            print(f"Ref text (buffered): {ref_text_buf}")
-            print(f"Hyp text (buffered): {hyp_text_buf}")
+            logger.debug(f"Ref text (buffered): {ref_text_buf}")
+            logger.debug(f"Hyp text (buffered): {hyp_text_buf}")
             text_to_submit = (
                 ref_text_buf[: ref_start - ref_buf_start]
                 + hyp_text
                 + ref_text_buf[ref_end - ref_buf_start :]
             )
-            print(f"Text to submit: {text_to_submit}")
+            logger.debug(f"Text to submit: {text_to_submit}")
 
             # determine number of phonemes and estimate number of frames for the output
             n_syllables = syllables.estimate(" ".join(hyp_text))
-            print(f"Hyp syllables: {n_syllables}")
+            logger.debug(f"Hyp syllables: {n_syllables}")
             n_frames = int(n_syllables * audio_token_syllable_ratio) # 4 syllables/sec
-            print(f"N frames: {n_frames}")
+            logger.debug(f"N frames: {n_frames}")
 
             # crudely split the diff into multiple chunks if it's too long (> max_audio_frames = 750 frames = 15s)
             if n_frames > self.max_audio_frames:
@@ -566,7 +568,7 @@ class PlayDiffusion():
                         text_tokens,
                     )
                 )
-        print(f"{len(diffs)} diffs to inpaint")
+        logger.debug(f"{len(diffs)} diffs to inpaint")
         return diffs
 
     def do_inpaint(self, diffs: List[InpainterChunk], input_audio_tokens, input):
@@ -586,21 +588,21 @@ class PlayDiffusion():
                     start_frame / self.frame_rate if start_frame is not None else -1
                 )
                 end_time = end_frame / self.frame_rate if end_frame is not None else -1
-                print(
+                logger.debug(
                     f"Generating inpainted audio for {start_frame} ({start_time:.2f}s) \
                     to {end_frame} ({end_time:.2f}s) with {n_frames} inpainted frames \
                     ({n_frames / self.frame_rate:.2f}s)"
                 )
-                print(f"Text tokens shape: {text_tokens.shape}")
+                logger.debug(f"Text tokens shape: {text_tokens.shape}")
                 text = self.mm.tokenizer.decode_tokens_tensor(text_tokens)
-                print(f"Text: {text}")
+                logger.debug(f"Text: {text}")
 
                 # save the previous unchanged audio tokens
                 if start_frame is not None and start_frame > last_end_frame + 1:
                     output_chunks.append(
                         input_audio_tokens[:, last_end_frame + 1 : start_frame]
                     )
-                    print(f"Unchanged audio tokens shape: {output_chunks[-1].shape}")
+                    logger.debug(f"Unchanged audio tokens shape: {output_chunks[-1].shape}")
                 if end_frame is not None:
                     last_end_frame = end_frame
 
@@ -632,15 +634,15 @@ class PlayDiffusion():
                     inpainter_end_frame = inpaint_audio_tokens.shape[1]
 
                 # inpaint the desired region, with the static buffer unmodified
-                print(
+                logger.debug(
                     f"Pre-inpaint audio tokens shape: {inpaint_audio_tokens.shape} \
                         ({inpaint_audio_tokens.shape[1] / self.frame_rate:.2f}s)"
                 )
-                print(
+                logger.debug(
                     f"PlayDiffusion start frame: {inpainter_start_frame} \
                         ({inpainter_start_frame / self.frame_rate:.2f}s)"
                 )
-                print(
+                logger.debug(
                     f"PlayDiffusion end frame: {inpainter_end_frame} \
                         ({inpainter_end_frame / self.frame_rate:.2f}s)"
                 )
@@ -657,14 +659,14 @@ class PlayDiffusion():
                     start_frame=inpainter_start_frame,
                     end_frame=inpainter_end_frame,
                 )  # 1, T
-                print(f"Post-inpaint audio tokens shape: {inpaint_audio_tokens.shape}")
+                logger.debug(f"Post-inpaint audio tokens shape: {inpaint_audio_tokens.shape}")
 
                 # save the actual inpainted audio tokens
                 inpaint_audio_tokens = inpaint_audio_tokens[
                     :,
                     inpainter_start_frame : inpainter_start_frame + n_frames,
                 ]
-                print(
+                logger.debug(
                     f"Trimmed inpainted audio token shape: {inpaint_audio_tokens.shape}"
                 )
                 output_chunks.append(inpaint_audio_tokens)
@@ -672,7 +674,7 @@ class PlayDiffusion():
         # save the remaining unchanged audio tokens and concatenate all chunks
         if input_audio_tokens.shape[-1] > last_end_frame + 1:
             output_chunks.append(input_audio_tokens[:, last_end_frame + 1 :])
-            print(f"Unchanged audio tokens shape: {output_chunks[-1].shape}")
+            logger.debug(f"Unchanged audio tokens shape: {output_chunks[-1].shape}")
         return torch.cat(output_chunks, dim=1)
 
 
@@ -684,13 +686,13 @@ class PlayDiffusion():
 
         self.timer.reset()
 
-        print(f"Input: {input}")
+        logger.debug(f"Input: {input}")
 
         # normalize the input text
         input_text = unidecode(input.input_text)
         output_text = unidecode(input.output_text)
-        print(f"Inpainter input text: {input_text}")
-        print(f"Inpainter output text: {output_text}")
+        logger.debug(f"Inpainter input text: {input_text}")
+        logger.debug(f"Inpainter output text: {output_text}")
         self.timer("Normalize text")
 
         # determine differences between input and output text
@@ -707,13 +709,13 @@ class PlayDiffusion():
         resampled_wav = F.resample(
             input_wav, orig_freq=sr, new_freq=self.mm.speech_tokenizer_sample_rate
         )
-        print(f"Resampled wav: {resampled_wav.shape}")
+        logger.debug(f"Resampled wav: {resampled_wav.shape}")
         self.timer("Resample")
         with torch.inference_mode():
             input_audio_tokens = self.mm.speech_tokenizer.waveform_to_units(
                 resampled_wav.squeeze()
             )
-        print(f"Input audio tokens: {input_audio_tokens.shape}")
+        logger.debug(f"Input audio tokens: {input_audio_tokens.shape}")
         self.timer("Speech tokenizer")
 
         # calculate alignment to determine word times
@@ -789,15 +791,15 @@ class PlayDiffusion():
 
         self.timer.reset()
 
-        print(f"Input: {input}")
+        logger.debug(f"Input: {input}")
 
         # normalize the input text
         output_text = unidecode(input.output_text)
-        print(f"TTS text: {output_text}")
+        logger.debug(f"TTS text: {output_text}")
         split_texts = self.split_text_as_necessary(output_text)
-        print(f"Split texts:")
+        logger.debug(f"Split texts:")
         for text in split_texts:
-            print(f"    {text}")
+            logger.debug(f"    {text}")
         self.timer("Normalize and split text")
 
         with torch.inference_mode():
@@ -817,7 +819,7 @@ class PlayDiffusion():
                 self.timer("Estimate frames")
 
                 # generate the TTS result
-                print(f"Generating TTS with {target_len} frames")
+                logger.debug(f"Generating TTS with {target_len} frames")
                 tts_result_tokens.append(self.mm.inpainter.generate(
                     text_tokens=text_tokens,
                     target_len=target_len,
@@ -842,7 +844,7 @@ class PlayDiffusion():
 
         self.timer.reset()
 
-        print(f"Input: {input}")
+        logger.debug(f"Input: {input}")
         
         # get target voice's vocoder_emb
         vocoder_emb = get_vocoder_embedding(input.target_voice, self.mm).to(self.device)
@@ -854,13 +856,13 @@ class PlayDiffusion():
         resampled_wav = F.resample(
             input_wav, orig_freq=sr, new_freq=self.mm.speech_tokenizer_sample_rate
         )
-        print(f"Resampled wav: {resampled_wav.shape}")
+        logger.debug(f"Resampled wav: {resampled_wav.shape}")
         self.timer("Resample")
         with torch.inference_mode():
             input_audio_tokens = self.mm.speech_tokenizer.waveform_to_units(
                 resampled_wav.squeeze()
             )
-        print(f"Input audio tokens: {input_audio_tokens.shape}")
+        logger.debug(f"Input audio tokens: {input_audio_tokens.shape}")
         self.timer("Speech tokenizer")
 
         # vocode the output audio

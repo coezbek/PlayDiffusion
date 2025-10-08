@@ -1,3 +1,7 @@
+
+import logging
+logger = logging.getLogger(__name__)
+
 class PlayDiffusionModelManager:
     def __init__(self, preset: dict, device):
         import torch
@@ -29,7 +33,7 @@ class PlayDiffusionModelManager:
     def load_vocoder(self, config: dict):
         from playdiffusion.models.vocoder.ldm_bigvgan import load_ldm_bigvgan
 
-        print(f"Using vocoder checkpoint: {config['checkpoint']}")
+        logger.info(f"Using vocoder checkpoint: {config['checkpoint']}")
 
         return load_ldm_bigvgan(
             **config,
@@ -44,12 +48,12 @@ class PlayDiffusionModelManager:
         from playdiffusion.models.speech_tokenizer.speech_tokenizer import SpeechTokenizer
         from playdiffusion.models.tokenizer.pp_tokenizer import PPTokenizer
 
-        print("Loading tokenizer")
+        logger.info("Loading tokenizer")
         tokenizer = PPTokenizer(
             **tokenizer_config, device=self.device,
         )
 
-        print("Loading speech tokenizer")
+        logger.info("Loading speech tokenizer")
         speech_tokenizer = SpeechTokenizer(
             **speech_tokenizer_config, device=self.device
         )
@@ -85,5 +89,5 @@ class PlayDiffusionModelManager:
     def load_inpainter(self, config: dict):
         from playdiffusion.models.inpainter.masklm_text import load_maskgct_inpainter
 
-        print(f"Using inpainter checkpoint: {config['checkpoint']}")
+        logger.info(f"Using inpainter checkpoint: {config['checkpoint']}")
         return load_maskgct_inpainter(**config, device=self.device)

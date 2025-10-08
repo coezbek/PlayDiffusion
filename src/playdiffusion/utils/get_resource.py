@@ -1,5 +1,8 @@
 import os
 import re
+import logging
+
+logger = logging.getLogger(__name__)
 from playdiffusion.utils.loading import save_resource
 
 _USER_DOWNLOAD_DIR = os.path.join(os.path.expanduser("~"), ".cache", "playht", "resources")
@@ -30,6 +33,6 @@ def get_resource(uri: str, download = True, models_dir = None):
     if os.path.isfile(path):
         return path
     if os.path.exists(path):
-        print(f"Target path '{path}' for uri '{uri}' exists and is a directory, this must be for SGLang HF loading")
+        logger.info(f"Target path '{path}' for uri '{uri}' exists and is a directory, this must be for SGLang HF loading")
         return path
     raise ValueError(f"Target path '{path}' for uri '{uri}' does not exist")

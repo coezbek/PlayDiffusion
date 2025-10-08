@@ -2,10 +2,12 @@ import boto3
 import os
 import tqdm
 import zipfile
+import logging
 from decouple import config
 
 from urllib import request
 
+logger = logging.getLogger(__name__)
 
 class S3Progress:
     def __init__(self, name, total_size):
@@ -43,7 +45,7 @@ class RequestProgress:
 def save_resource(url: str, path: str, verbose=True, recursive=False):
     """Retrieve a resource from a URL or local path and save it to a local path."""
     if verbose:
-        print(f"Downloading {url} to {path}")
+        logger.info(f"Downloading {url} to {path}")
 
     file_name = url.split("/")[-1]
     if url.endswith(".zip"):

@@ -1,3 +1,6 @@
+import logging
+logger = logging.getLogger(__name__)
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -85,21 +88,21 @@ def get_voice_embedding(
     embs = []
     for i in range(audio.shape[0]):
         if torch.max(torch.abs(audio[i])) == 0:
-            print(f"Zero audio in chunk {i}. Skipping.")
+            logger.warning(f"Zero audio in chunk {i}. Skipping.")
             continue
 
         if normalize_audio:
             audio[i] = audio[i] / torch.max(torch.abs(audio[i]))
 
         if audio[i].isnan().any():
-            print(f"NaN in audio in chunk {i}. Skipping.")
+            logger.warning(f"NaN in audio in chunk {i}. Skipping.")
             continue
 
         mel_spectogram = mel.encode(audio[i])
 
         emb = voice_encoder(mel_spectogram)
         if emb.isnan().any():
-            print(f"NaN in voice embedding in chunk {i}. Skipping.")
+            logger.warning(f"NaN in voice embedding in chunk {i}. Skipping.")
             continue
         embs.append(emb)
 

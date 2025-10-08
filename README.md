@@ -53,7 +53,6 @@ docker run -it --rm \
 
 ## Introduction
 
-
 Autoregressive transformer models have proven highly effective for synthesizing speech from text. However, they face a significant limitation: **modifying portions of the generated audio —known as inpainting— or removing them without leaving discontinuity artifacts is beyond their standard capabilities**. Thus different approaches are needed for more general speech editing tools. Consider the sentence:
 
 > *“The answer is out there, Neo. It's looking for you.”*
@@ -119,6 +118,11 @@ During **inference**, decoding occurs iteratively, starting with a **fully maske
 
 This iterative decoding process continues until all steps are complete, gradually refining token predictions and resulting in coherent, high-quality audio outputs.
 
+## Limitations
+
+- PlayDiffusion transliterates input text using [Unidecode](https://pypi.org/project/Unidecode/) which strips accents and diacritics and maps non-Latin characters to their closest representation in ASCII alphabet. This can lead to mispronunciations for non-English names or words.
+- PlayDiffusion uses Jiwer to compare input and target text to determine which words to edit which includes punctuation to determine difference. For instance an extra comma in the output text will cause the preceding word to be marked for editing. Think: "Panda, eats, shoots, and leaves" vs. "Panda eats shoots and leaves".
+
 ## **Reference:**
 
 [1] Alon Ziv, Itai Gat, Gael Le Lan, Tal Remez, Felix Kreuk, Alexandre Défossez, Jade Copet, Gabriel Synnaeve, and Yossi Adi. 2024. Masked audio generation using a single non-autoregressive transformer. arXiv preprint [arXiv:2401.04577](https://arxiv.org/pdf/2401.04577).
@@ -126,3 +130,38 @@ This iterative decoding process continues until all steps are complete, graduall
 [2] Zalán Borsos, Matt Sharifi, Damien Vincent, Eugene Kharitonov, Neil Zeghidour, and Marco Tagliasacchi. 2023. SoundStorm: Efficient parallel audio generation. arXiv preprint [arXiv:2305.09636](https://arxiv.org/pdf/2305.09636).
 
 [3] Yuancheng Wang, Haoyue Zhan, Liwei Liu, Ruihong Zeng, Haotian Guo, Jiachen Zheng, Qiang Zhang, Xueyao Zhang, Shunsi Zhang, and Zhizheng Wu. 2025. Maskgct: Zero-shot text-to-speech with masked generative codec transformer. In ICLR. [Arxiv link](https://arxiv.org/pdf/2409.00750).
+
+## Logging
+
+The `playdiffusion` library uses named loggers to provide insight into its operations. You can enable these to debug specific subsystems.
+
+To enable logging, add the following configuration to your script:
+
+```python
+import logging
+
+# If not already configured, set up basic logging configuration.
+logging.basicConfig(level=logging.WARNING, format='[%(levelname)s] %(message)s')
+
+# Enable logging for the entire playdiffusion library.
+# Use INFO for high-level operations or DEBUG for maximum verbosity.
+logging.getLogger('playdiffusion').setLevel(logging.INFO)
+
+# Specific modules:
+
+# 1. Inference and Alignment Logic:
+# See detailed steps for text alignment, word timing handling, diff chunking,
+# and syllable ratio calculations.
+logging.getLogger('playdiffusion.inference').setLevel(logging.DEBUG)
+
+# 2. GPU Memory Management:
+# Monitor the automatic GPU memory cleanup, fragmentation checks, and usage statistics.
+# Useful for diagnosing CUDA out-of-memory errors.
+logging.getLogger('playdiffusion.utils.gpu_memory_manager').setLevel(logging.DEBUG)
+
+# 3. Performance Profiling:
+# The internal Timer outputs its timings at the DEBUG level. Enable this to see
+# the duration of each step in the pipeline (e.g., Vocoder, Inpainter, etc.).
+logging.getLogger('playdiffusion.utils.audio_utils').setLevel(logging.DEBUG)
+
+```
