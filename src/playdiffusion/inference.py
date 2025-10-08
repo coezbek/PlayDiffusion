@@ -28,10 +28,19 @@ class TextDiffChunk:
 class InpainterChunk:
     import torch
 
+    # Start frame of the region to inpaint. Can be None if inpainting is before the start of the audio
     start_frame: Optional[int]
+
+    # End frame of the region to inpaint. If None, consider end_frame == start_frame + n_frames
     end_frame: Optional[int]
+
+    # Number of frames to inpaint
     n_frames: int
+
+    # Start of the static buffer (region not to be modified but passed to inpainter)
     buf_start_frame: Optional[int]
+
+    # End of the static buffer (region not to be modified but passed to inpainter)
     buf_end_frame: Optional[int]
     text_tokens: torch.Tensor
 
@@ -51,6 +60,7 @@ class PlayDiffusion():
         self.frame_rate = 50
         # avg en speaker speaks 4 syllables/sec
         self.default_audio_token_syllable_ratio = self.frame_rate / 4
+        # max number of audio tokens to inpaint at once (750 tokens = 15s)
         self.max_audio_frames = 750
         # if no silence, how many extra words to inpaint on each side of actual change
         self.dynamic_word_buffer = 1
@@ -500,10 +510,10 @@ class PlayDiffusion():
             # determine number of phonemes and estimate number of frames for the output
             n_syllables = syllables.estimate(" ".join(hyp_text))
             print(f"Hyp syllables: {n_syllables}")
-            n_frames = int(n_syllables * audio_token_syllable_ratio)
+            n_frames = int(n_syllables * audio_token_syllable_ratio) # 4 syllables/sec
             print(f"N frames: {n_frames}")
 
-            # crudely split the diff into multiple chunks if it's too long
+            # crudely split the diff into multiple chunks if it's too long (> max_audio_frames = 750 frames = 15s)
             if n_frames > self.max_audio_frames:
                 n_subdiffs = 1 + n_frames // self.max_audio_frames
                 sub_words = np.array_split(text_to_submit, n_subdiffs)
@@ -604,7 +614,9 @@ class PlayDiffusion():
                     inpainter_start_frame = start_frame - buf_start_frame
                 else:
                     inpainter_start_frame = 0
+                
                 # make sure the region to inpaint is the correct length
+                # TODO: What is the magic 8857 token? Closest to silence?
                 tokens_to_cat.append(
                     torch.full(
                         (1, n_frames), 8857, dtype=torch.int32, device=self.device
@@ -824,6 +836,7 @@ class PlayDiffusion():
         return (self.mm.vocoder.output_frequency, make_16bit_pcm(audio_g).squeeze())
 
     def rvc(self, input: RVCInput):
+        """Perform Retrieval-based Voice Conversion on the input audio to match the target voice."""
         import torch
         import torchaudio.functional as F
 
