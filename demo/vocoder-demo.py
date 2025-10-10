@@ -65,7 +65,7 @@ def main():
     print("Encoding audio to tokens...")
     with torch.inference_mode():
         # The tokenizer expects a 1D tensor for a single file, and returns (1, T)
-        audio_tokens = modelmanager.speech_tokenizer.waveform_to_units(wav_16k.squeeze(0).to(device))
+        audio_tokens, _ = modelmanager.speech_tokenizer.waveform_to_units(wav_16k.squeeze(0).to(device))
         print(f" -> Encoded to audio tokens with shape: {audio_tokens.shape}")
 
         # 5. Get the voice embedding from the original audio
