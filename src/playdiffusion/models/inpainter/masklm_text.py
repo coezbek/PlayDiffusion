@@ -140,8 +140,8 @@ class MaskGCT(nn.Module):
         rescale_cfg = 0.75,
         topk = 20,
         code = None,
-        start_frame = None,
-        end_frame = None
+        start_frame = None, # Inclusive
+        end_frame = None # Exclusive!
     ):
         """
         text_tokens: B, T
@@ -163,17 +163,17 @@ class MaskGCT(nn.Module):
             assert end_frame is not None
             T = code.size(-1)
             if start_frame > 0:
-                code_before = code[:, 0 : start_frame]
+                code_before = code[:, 0:start_frame]
             else:
                 start_frame = 0
                 code_before = None
 
-            if end_frame < T-1:
+            if end_frame < T:
                 code_after = code[:, end_frame:]
             else:
-                end_frame = T - 1
+                end_frame = T
                 code_after = None
-            target_len = end_frame - start_frame + 1
+            target_len = end_frame - start_frame
         else:       # TTS
             assert start_frame is None and end_frame is None
             code_before = None

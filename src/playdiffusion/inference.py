@@ -614,7 +614,7 @@ class PlayDiffusion():
 
         with torch.inference_mode():
             output_chunks = []
-            last_end_frame = -1
+            last_end_frame = 0 # last_end_frame is exclusive index of the last inpainted region
             for chunk in diffs:
                 start_frame = chunk.start_frame
                 end_frame = chunk.end_frame
@@ -636,9 +636,9 @@ class PlayDiffusion():
                 logger.debug(f"Text: {text}")
 
                 # save the previous unchanged audio tokens
-                if start_frame is not None and start_frame > last_end_frame + 1:
+                if start_frame is not None and start_frame > last_end_frame:
                     output_chunks.append(
-                        input_audio_tokens[:, last_end_frame + 1 : start_frame]
+                        input_audio_tokens[:, last_end_frame : start_frame]
                     )
                     logger.debug(f"Unchanged audio tokens shape: {output_chunks[-1].shape}")
                 if end_frame is not None:
@@ -712,8 +712,8 @@ class PlayDiffusion():
                 output_chunks.append(inpaint_audio_tokens)
 
         # save the remaining unchanged audio tokens and concatenate all chunks
-        if input_audio_tokens.shape[-1] > last_end_frame + 1:
-            output_chunks.append(input_audio_tokens[:, last_end_frame + 1 :])
+        if input_audio_tokens.shape[-1] > last_end_frame:
+            output_chunks.append(input_audio_tokens[:, last_end_frame:])
             logger.debug(f"Unchanged audio tokens shape: {output_chunks[-1].shape}")
         return torch.cat(output_chunks, dim=1)
 
