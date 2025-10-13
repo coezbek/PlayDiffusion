@@ -618,7 +618,9 @@ class PlayDiffusion():
                     inpainter_start_frame = 0
                 
                 # make sure the region to inpaint is the correct length
-                # TODO: What is the magic 8857 token? Closest to silence?
+                # Q: What is the magic 8857 token? Closest to silence?
+                # A: No, it is just a random id. The Mask GCT will discard 
+                # this input in its generate function.
                 tokens_to_cat.append(
                     torch.full(
                         (1, n_frames), 8857, dtype=torch.int32, device=self.device
