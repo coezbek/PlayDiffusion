@@ -46,6 +46,44 @@ class InpainterChunk:
     buf_end_frame: Optional[int]
     text_tokens: torch.Tensor
 
+    def get_inpaint_audio_tokens(self, input_audio_tokens) -> tuple[torch.Tensor, int, int]:
+        """
+        Get the audio tokens to pass to the inpainter, including static buffer if any.
+        
+        Returns:
+            - the audio tokens, 
+            - the start frame of the inpainted region (inclusive) within the returned tokens,
+            - and the end frame of the inpainted region (exclusive) within the returned tokens.
+        """
+        import torch
+        tokens_to_cat = []
+
+        # assemble the tokens to pass to the inpainter
+        # possibly including static buffer at begin and/or end
+        if self.buf_start_frame is not None and self.start_frame is not None:
+            tokens_to_cat.append(
+                input_audio_tokens[:, self.buf_start_frame:self.start_frame]
+            )
+            inpainter_start_frame = self.start_frame - self.buf_start_frame
+        else:
+            inpainter_start_frame = 0
+
+        # make sure the region to inpaint is the correct length
+        tokens_to_cat.append(
+            torch.full(
+                (1, self.n_frames), 8857, dtype=torch.int32, device=input_audio_tokens.device
+            )
+        )
+        if self.end_frame is not None and self.buf_end_frame is not None:
+            tokens_to_cat.append(input_audio_tokens[:, self.end_frame:self.buf_end_frame])
+            inpainter_end_frame = inpainter_start_frame + self.n_frames
+        else:
+            inpainter_end_frame = -1
+        inpaint_audio_tokens = torch.cat(tokens_to_cat, dim=1)
+        if inpainter_end_frame == -1:
+            inpainter_end_frame = inpaint_audio_tokens.shape[1]
+
+        return inpaint_audio_tokens, inpainter_start_frame, inpainter_end_frame
 
 class PlayDiffusion():
     def __init__(self, device: str = "cuda"):
