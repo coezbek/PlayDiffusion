@@ -1,3 +1,4 @@
+import argparse
 import os
 
 import gradio as gr
@@ -109,6 +110,13 @@ def speech_rvc(rvc_source_speech, rvc_target_voice):
 
 
 if __name__ == '__main__':
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        '--public', action='store_true', help='Share the demo publicly'
+    )
+    args = parser.parse_args()
+
     with gr.Blocks(analytics_enabled=False, title="PlayDiffusion") as demo:
         gr.Markdown("## PlayDiffusion")
 
@@ -215,4 +223,4 @@ if __name__ == '__main__':
                 outputs=[rvc_output]
             )
 
-    demo.launch(share=True)
+    demo.launch(share=args.public)
