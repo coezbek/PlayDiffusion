@@ -5,6 +5,8 @@ from openai import OpenAI
 
 from playdiffusion import PlayDiffusion, InpaintInput, TTSInput, RVCInput
 import whisper_timestamped as whisper
+import logging
+logging.basicConfig(level=logging.DEBUG)
 
 inpainter = PlayDiffusion()
 
