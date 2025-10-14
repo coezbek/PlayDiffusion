@@ -90,9 +90,9 @@ class SpeechEncoder(torch.nn.Module):
         :param layout:
             The layout of the batch (containing sequence lengths).
         """
-        seqs, layout = self.model.encoder_frontend(seqs, layout)
-        encoder_output = self.model.encoder(seqs, layout)
-        return encoder_output
+        seqs, layout_out = self.model.encoder_frontend(seqs, layout)
+        encoder_output = self.model.encoder(seqs, layout_out)
+        return encoder_output, layout_out
 
 
 class SpeechTokenizer(torch.nn.Module):
@@ -144,27 +144,36 @@ class SpeechTokenizer(torch.nn.Module):
         seqs = seqs.to(self.device, self.dtype)
 
         B, T_max = int(seqs.size(0)), int(seqs.size(1))
-        layout = BatchLayout(shape=(B, T_max), seq_lens=lens, device=seqs.device)
-        return seqs, layout
+        seqs_layout = BatchLayout(shape=(B, T_max), seq_lens=lens, device=seqs.device)
+        return seqs, seqs_layout
 
     @torch.inference_mode()
-    def forward(self, seqs: torch.Tensor, layout: BatchLayout) -> torch.Tensor:
+    def forward(self, seqs: torch.Tensor, seqs_layout: BatchLayout) -> tuple[torch.Tensor, BatchLayout]:
         
         units = None
         if torch.cuda.is_available():
             self.cuda_stream.wait_stream(torch.cuda.current_stream())
             with torch.cuda.stream(self.cuda_stream):
-                z = self.encoder(seqs, layout)
+                z, unit_layout = self.encoder(seqs, seqs_layout)
                 units = self.kmeans(z)
                 self.gpu_memory_manager.check_and_cleanup()
             torch.cuda.current_stream().wait_stream(self.cuda_stream)
         else:
-            z = self.encoder(seqs, layout)
-            units = self.kmeans(z)
-        return units
+            z, unit_layout = self.encoder(seqs, seqs_layout)
+            units = self.kmeans(z) # Doesn't modify layout
+        return units, unit_layout
 
     @torch.inference_mode()
-    def waveform_to_units(self, waveform: torch.Tensor) -> torch.Tensor:
-        seqs, layout = self.create_batch(waveform)
-        units = self(seqs, layout)
-        return units
+    def waveform_to_units(self, waveform: Union[torch.Tensor, List[torch.Tensor], Tuple[torch.Tensor, ...]]) -> tuple[torch.Tensor, BatchLayout]:
+        """
+        Converts a single waveform tensors or a list of waveform tensors into audio tokens.
+        
+        Returns a batch of audio tokens [B, T] and the corresponding BatchLayout 
+        Use unit_layout.seq_lens to get the length of the individual audio token tensors.
+
+        Output units are tokens of dtype torch.int64
+        0 <= token < num_embeddings (e.g., 10000 for kmeans_10k.npy)
+        """
+        seqs, seqs_layout = self.create_batch(waveform)
+        units, unit_layout = self(seqs, seqs_layout)
+        return units, unit_layout
