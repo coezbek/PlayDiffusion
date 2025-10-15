@@ -197,117 +197,178 @@ class MaskGCT(nn.Module):
 
     def reverse_diffusion(
         self,
-        target_len,
-        text_codes,
-        n_timesteps=40,
-        init_temp = 1.5,
-        init_diversity = 1,
-        guidance = 0,
-        rescale_cfg = 0.75,
-        topk = 20,
-        code_before = None,
-        code_after = None
+        target_len, # The number of audio tokens to generate in the masked region for each item in the batch.
+        text_codes, # The tokenized text for the code_before+inpainting target+code_after. Shape: (B, Text_T) where B is batch size.
+        n_timesteps=40, # The max number of iterative refinement steps in the diffusion process.
+        init_temp=1.5, # Initial temperature for Gumbel-Softmax sampling, controlling randomness. Anneals to 0.
+        init_diversity=1, # Initial diversity for re-masking. Higher values lead to more aggressive re-masking of low-confidence tokens. Anneals to 0.
+        guidance=0, # Strength of the classifier-free guidance. 0 disables guidance.
+        rescale_cfg=0.75, # A factor to rescale the guided embeddings, preventing their magnitude from exploding.
+        topk=20, # The number of top-probability logits to consider during sampling at each step.
+        code_before=None, # The audio tokens of the context BEFORE the region to be inpainted. Shape: (B, Before_T).
+        code_after=None # The audio tokens of the context AFTER the region to be inpainted. Shape: (B, After_T).
     ):
         """
-        text_codes: B, T
-        code_before: B, T
-        code_after: B, T
+        Generates audio tokens for a masked region using an iterative reverse diffusion process.
+
+        Args:
+            text_codes (torch.Tensor): Tensor of text tokens. Shape: (B, T_text).
+            code_before (torch.Tensor, optional): Tensor of audio tokens preceding the target region. Shape: (B, T_before).
+            code_after (torch.Tensor, optional): Tensor of audio tokens succeeding the target region. Shape: (B, T_after).
         """
         device = text_codes.device
 
+        # Get the batch size (B) and the length of the text sequence from the input tensor.
         bsize = text_codes.size(0)
         text_len = text_codes.size(-1)
 
+        # --- Context Preparation ---
+        # Initialize the length of the 'before' context to 0.
         T_before = 0
+        # If preceding audio context is provided...
         if code_before is not None:
+            # Get its length.
             T_before = code_before.size(-1)
+            # Convert the raw audio tokens to the model's internal combined vocabulary space.
             code_before = self.convert_audio_to_vocab(code_before)
+        # If succeeding audio context is provided...
         if code_after is not None:
+            # Convert its raw audio tokens to the model's internal vocabulary space.
             code_after = self.convert_audio_to_vocab(code_after)
 
-        codes = torch.full((bsize, target_len), self.mask_idx).to(device)  # (B, T)
-        mask = torch.full((bsize, target_len), True).to(device)  # (B, T)
+        # --- Initialization for the Diffusion Loop ---
+        # Initialize the target region for each item in the batch. Creates a tensor of shape (B, target_len)
+        # filled entirely with the special 'mask' token index.
+        codes = torch.full((bsize, target_len), self.mask_idx).to(device)
+        # Create a boolean mask of the same size, with all values True, indicating
+        # that initially, all tokens in the target region are masked for every batch item.
+        mask = torch.full((bsize, target_len), True).to(device)
 
+        # If classifier-free guidance is enabled...
         if guidance > 0:
+            # Create a "dropped" version of the text codes by replacing most tokens with a special guidance token.
+            # This is used to get an unconditional prediction from the model.
             text_codes_drop = torch.ones_like(text_codes) * self.text_guidance_idx
+            # Keep the beginning-of-sequence (BOS) and end-of-sequence (EOS) tokens for structural integrity.
             text_codes_drop[:, 0] = self.bos_idx
             text_codes_drop[:, -1] = self.eos_idx
 
+        # --- Timestep Schedule ---
+        # Calculate the step size for the time variable 't', which anneals from 1.0 down to 0.0.
         h = 1.0 / n_timesteps
+        # Create the list of discrete time values for each step of the diffusion process.
         t_list = [1.0 - i * h for i in range(n_timesteps)]
+        # Append 0.0 to the list for calculating the final number of masks.
         t_list.append(0.0)
 
+        # --- Main Diffusion Loop ---
         for i in range(n_timesteps):
-            t = t_list[i] * torch.ones(bsize).to(device)    # B
+            # Get the current time 't' for this step, broadcast to the batch size. Shape: (B,).
+            t = t_list[i] * torch.ones(bsize).to(device)
+            # If there's preceding context, prepend it to the current state of the codes for each batch item.
             if code_before is not None:
-                codes = torch.cat([code_before, codes], dim = -1)
+                codes = torch.cat([code_before, codes], dim=-1)
+            # If there's succeeding context, append it to the current state of the codes.
             if code_after is not None:
-                codes = torch.cat([codes, code_after], dim = -1)
+                codes = torch.cat([codes, code_after], dim=-1)
 
-            embeds = self.tok_embeddings(torch.cat([text_codes, codes], dim = -1))    # B, T, C
-            embeds = self.LM(embeds)     # B, T, C
-            embeds = embeds[:, text_len:, :]      # B, T, C
+            # --- Model Prediction ---
+            # Get token embeddings for the concatenated text and audio codes. Shape: (B, T_text + T_audio, C).
+            embeds = self.tok_embeddings(torch.cat([text_codes, codes], dim=-1))
+            # Pass the embeddings through the Transformer Language Model (LM) to get the output latents.
+            embeds = self.LM(embeds)
+            # We only need the predictions for the audio part, so slice off the latents corresponding to the text.
+            embeds = embeds[:, text_len:, :] # Shape: (B, T_audio, C).
 
+            # --- Classifier-Free Guidance ---
             if guidance > 0:
-                mask_embeds = self.tok_embeddings(torch.cat([text_codes_drop, codes], dim = -1))    # B, T, C
-                mask_embeds = self.LM(mask_embeds)     # B, T, C
-                mask_embeds = mask_embeds[:, text_len:, :]   # B, T, C
+                # Get a second set of embeddings using the "dropped" text for an unconditional prediction.
+                mask_embeds = self.tok_embeddings(torch.cat([text_codes_drop, codes], dim=-1))
+                mask_embeds = self.LM(mask_embeds)
+                mask_embeds = mask_embeds[:, text_len:, :]
 
+                # Store the standard deviation of the conditional embeddings for rescaling.
                 pos_emb_std = embeds.std()
+                # Apply guidance: Steer the conditional embeddings (`embeds`) away from the unconditional ones (`mask_embeds`).
                 embeds = embeds + guidance * (embeds - mask_embeds)
+                # Rescale the guided embeddings to prevent their values from growing too large and destabilizing the process.
                 rescale_embeds = embeds * pos_emb_std / embeds.std()
                 embeds = rescale_cfg * rescale_embeds + (1 - rescale_cfg) * embeds
 
+            # Slice `codes` and `embeds` back to contain only the target region for this step's sampling and re-masking.
             if code_before is not None or code_after is not None:
                 codes = codes[:, T_before : T_before + target_len]
                 embeds = embeds[:, T_before : T_before + target_len, :]
 
+            # --- Sampling Step ---
+            # Convert the final latent embeddings into logits over the audio vocabulary. Shape: (B, target_len, codebook_size).
+            logits = self.to_logits(embeds)
 
-            logits = self.to_logits(embeds)  # (B, T, codebook_size)
-
+            # The annealing scale decreases with each step, reducing randomness and diversity over time.
             annealing_scale = t_list[i]
             diversity = init_diversity * annealing_scale
             temp = init_temp * annealing_scale
 
-            logits = top_k(logits, k = topk)    # B, T, codebook_size
+            # Apply top-k filtering to the logits, restricting sampling to the 'k' most likely tokens.
+            logits = top_k(logits, k=topk)
 
-            if i == n_timesteps - 1:     # last step
-                sampled_ids = logits.argmax(dim=-1)    # B, T
+            # In the final step, choose the most likely token deterministically (greedy decoding).
+            if i == n_timesteps - 1:
+                sampled_ids = logits.argmax(dim=-1) # Shape: (B, target_len)
+            # In all other steps, sample stochastically using Gumbel-Softmax sampling for exploration.
             else:
-                sampled_ids = gumbel_sample(logits, temperature=max(temp, 1e-3))     # B, T
+                sampled_ids = gumbel_sample(logits, temperature=max(temp, 1e-3)) # Shape: (B, target_len)
 
+            # Update the `codes` tensor: where `mask` is True, insert the newly sampled IDs.
+            # Where `mask` is False (i.e., for tokens finalized in previous steps), keep the existing token.
             codes = torch.where(mask, self.convert_audio_to_vocab(sampled_ids), codes)
 
-            scores = logits.softmax(dim=-1)    # B, T, codebook_size
+            # --- Adaptive Re-masking Step ---
+            # Get the softmax probabilities for the predicted logits.
+            scores = logits.softmax(dim=-1) # Shape: (B, target_len, codebook_size)
+            # Gather the specific probability scores for the tokens that were actually sampled.
             scores = scores.gather(2, rearrange(sampled_ids, "b n -> b n 1"))
-            scores = rearrange(scores, "b n 1 -> b n")     # B, T
+            scores = rearrange(scores, "b n 1 -> b n") # Shape: (B, target_len)
 
+            # Create a combined confidence score based on the model's probability and Gumbel noise for diversity.
             scores = diversity * gumbel_noise(scores) + log(scores)
+            # Negate the scores so that the *least* confident tokens now have the *highest* values for top-k selection.
             scores = -1 * scores.float()
 
+            # Get the time value for the *next* step to determine how many tokens to re-mask.
             next_t = t_list[i + 1] * torch.ones(bsize).to(device)
 
+            # Calculate the number of tokens to mask in the next iteration. This number decreases as 't' approaches 0.
             next_mask_num = (self.get_mask_prob(next_t) * target_len).long()[0].item()
 
+            # If no tokens need to be masked in the next step, the process is complete.
             if next_mask_num == 0:
                 break
+            # Ensure we don't re-mask tokens that were already finalized by filling their scores with a very low value.
             scores = scores.masked_fill(
                 ~mask, -torch.finfo(scores.dtype).max
-            )  # B, T
+            )
 
+            # Find the indices of the `next_mask_num` tokens with the highest scores (i.e., lowest confidence).
             mask_indices = scores.topk(next_mask_num, dim=-1).indices
+            # Create the new boolean mask for the next iteration based on these indices.
             mask = torch.zeros_like(scores, dtype=torch.bool).scatter(
                 1, mask_indices, True
-            )   # B, T
+            )
+            # Apply the new mask to `codes`, replacing low-confidence tokens with the mask token for the next refinement step.
             codes = codes.masked_fill(mask, self.mask_idx)
 
+        # --- Finalization ---
+        # After the loop, if context was used, re-attach it to the final generated codes for the full sequence.
         if code_before is not None:
-            codes = torch.cat([code_before, codes], dim = -1)
+            codes = torch.cat([code_before, codes], dim=-1)
         if code_after is not None:
-            codes = torch.cat([codes, code_after], dim = -1)
+            codes = torch.cat([codes, code_after], dim=-1)
 
-        codes = self.convert_audio_to_vocab(codes, reverse = True)
+        # Convert the final tokens back from the model's internal vocabulary to the standard audio token IDs.
+        codes = self.convert_audio_to_vocab(codes, reverse=True)
 
+        # Return the completed sequence of audio tokens for the entire batch.
         return codes
 
 
