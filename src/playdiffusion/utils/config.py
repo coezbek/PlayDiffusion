@@ -19,7 +19,7 @@ class PlayDiffusionConfigurable(PlayDiffusion):
 
     ```yaml
     models:
-      inpainter_checkpoint: "last_250k_fixed.pkl"
+      inpainter: "last_250k_fixed.pkl"
       text_tokenizer: "tokenizer-multi_bpe16384_merged_extended_58M.json"
       speech_tokenizer: "xlsr2_1b_v2_custom.pt"
       kmeans_layer: "kmeans_10k.npy"
@@ -33,7 +33,7 @@ class PlayDiffusionConfigurable(PlayDiffusion):
         with open(config_path, 'r') as f:
             self.config = yaml.safe_load(f)
 
-        for key in ['inpainter_checkpoint', 'text_tokenizer', 'speech_tokenizer', 'kmeans_layer', 'voice_encoder', 'vocoder']:
+        for key in ['inpainter', 'text_tokenizer', 'speech_tokenizer', 'kmeans_layer', 'voice_encoder', 'vocoder']:
             if key not in self.config['models']:
                 raise ValueError(f"Missing required model path for '{key}' in config.")
             
@@ -46,8 +46,6 @@ class PlayDiffusionConfigurable(PlayDiffusion):
 
         model_paths = self.config['models']
 
-        # This function directly mirrors the structure of the original `load_preset`,
-        # but sources paths from the YAML config.
         preset = dict(
             vocoder=dict(
                 checkpoint=model_paths['vocoder'],
@@ -66,7 +64,7 @@ class PlayDiffusionConfigurable(PlayDiffusion):
                 checkpoint=model_paths['voice_encoder'],
             ),
             inpainter=dict(
-                checkpoint=model_paths['inpainter_checkpoint'], # This is our fine-tuning checkpoint
+                checkpoint=model_paths['inpainter'],
                 
             ),
         )

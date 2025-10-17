@@ -2,6 +2,8 @@ from dataclasses import dataclass
 import logging
 from typing import Dict, List, Optional
 
+import yaml
+
 from playdiffusion.models.model_manager import PlayDiffusionModelManager
 from playdiffusion.pydantic_models.models import InpaintInput, TTSInput, RVCInput
 from playdiffusion.utils.audio_utils import Timer, get_vocoder_embedding, load_audio
@@ -115,7 +117,7 @@ class PlayDiffusion():
 
     def load_preset(
         self,
-        hf_repo_id: str = "PlayHT/inpainter",
+        hf_repo_id: str = "oezi13/PlayDiffusion-nonverbal",
         vocoder_path: str = "v090_g_01105000",
         tokenizer_path: str = "tokenizer-multi_bpe16384_merged_extended_58M.json",
         speech_tokenizer_path: str = "xlsr2_1b_v2_custom.pt",
@@ -125,12 +127,20 @@ class PlayDiffusion():
     ) -> dict:
         from huggingface_hub import hf_hub_download
 
-        vocoder_path = hf_hub_download(repo_id=hf_repo_id, filename=vocoder_path)
-        tokenizer_path = hf_hub_download(repo_id=hf_repo_id, filename=tokenizer_path)
-        speech_tokenizer_path = hf_hub_download(repo_id=hf_repo_id, filename=speech_tokenizer_path)
-        kmeans_layer_path = hf_hub_download(repo_id=hf_repo_id, filename=kmeans_layer_path)
-        voice_encoder_path = hf_hub_download(repo_id=hf_repo_id, filename=voice_encoder_path)
-        inpainter_path = hf_hub_download(repo_id=hf_repo_id, filename=inpainter_path)
+        try:
+            config_path = hf_hub_download(repo_id=hf_repo_id, filename="config.yaml")
+            with open(config_path, 'r') as f:
+                config = yaml.safe_load(f).get('models', {})
+        except Exception as e:
+            logger.warning(f"Could not load config.yaml from {hf_repo_id}: {e}")
+            config = {}
+
+        vocoder_path = hf_hub_download(repo_id=hf_repo_id, filename=config.get('vocoder', vocoder_path))
+        tokenizer_path = hf_hub_download(repo_id=hf_repo_id, filename=config.get('text_tokenizer', tokenizer_path))
+        speech_tokenizer_path = hf_hub_download(repo_id=hf_repo_id, filename=config.get('speech_tokenizer', speech_tokenizer_path))
+        kmeans_layer_path = hf_hub_download(repo_id=hf_repo_id, filename=config.get('kmeans_layer', kmeans_layer_path))
+        voice_encoder_path = hf_hub_download(repo_id=hf_repo_id, filename=config.get('voice_encoder', voice_encoder_path))
+        inpainter_path = hf_hub_download(repo_id=hf_repo_id, filename=config.get('inpainter', inpainter_path))
 
         preset = dict(
             vocoder = dict(
