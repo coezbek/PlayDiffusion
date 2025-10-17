@@ -23,8 +23,7 @@ RUN git clone https://github.com/playht/PlayDiffusion /app/PlayDiffusion
 WORKDIR /app/PlayDiffusion
 
 # Upgrade pip and install dependencies (including demo)
-RUN pip install --upgrade pip && \
-    pip install '.[demo]'
+RUN pip install uv && uv sync
 
 # Create HuggingFace cache mount path
 ENV HF_HOME=/app/.cache/huggingface
@@ -33,4 +32,4 @@ ENV HF_HOME=/app/.cache/huggingface
 EXPOSE 7860
 
 # Set default run command
-CMD ["python", "demo/gradio-demo.py"]
+CMD ["uv", "run", "demo/gradio-demo.py"]
