@@ -40,7 +40,7 @@ docker run -it --rm \
   --gpus all \
   --network=host \
   -v $HOME/.cache/huggingface:/app/.cache/huggingface \
-  -v $HOME/.cache/whisper:$HOME/.cache/whisper
+  -v $HOME/.cache/whisper:$HOME/.cache/whisper \
   -p 7860:7860 \
   playdiffusion-py:latest
 ```
