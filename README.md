@@ -15,21 +15,6 @@ Requires OPENAI_API_KEY env var for ASR and word timings--you can also use some 
 
 ## Docker / Podman
 
-```
-podman build -t playdiffusion-py:latest .
-```
-
-```
-podman run -it --rm \
-  --device nvidia.com/gpu=all \
-  --network=host \
-  -v $HOME/.cache/huggingface:/app/.cache/huggingface \
-  -v $HOME/.cache/whisper:$HOME/.cache/whisper \
-  -p 7860:7860 \
-  playdiffusion-py:latest
-```
-
-or
 
 ```
 docker build -t playdiffusion-py:latest .
@@ -41,7 +26,21 @@ docker run -it --rm \
   --network=host \
   -v $HOME/.cache/huggingface:/app/.cache/huggingface \
   -v $HOME/.cache/whisper:$HOME/.cache/whisper \
-  -p 7860:7860 \
+  playdiffusion-py:latest
+```
+
+or Podman (untested):
+
+```
+podman build -t playdiffusion-py:latest .
+```
+
+```
+podman run -it --rm \
+  --device nvidia.com/gpu=all \
+  --network=host \
+  -v $HOME/.cache/huggingface:/app/.cache/huggingface \
+  -v $HOME/.cache/whisper:$HOME/.cache/whisper \
   playdiffusion-py:latest
 ```
 
