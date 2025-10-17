@@ -4,7 +4,7 @@ https://github.com/user-attachments/assets/5b15f9d5-cb53-450f-84f6-5f7dda3e44e5
 
 This is a fork of [PlayDiffusion](https://blog.play.ai/blog/play-diffusion) ([GitHub repo](https://github.com/PlayHT/playdiffusion)) that adds support for basic non-verbal tags.
 
-It uses a finetune of [HF PlayHT/PlayDiffusion](https://huggingface.co/PlayHT/PlayDiffusion) available at [oezi/](https://huggingface.co/coezbek/pd_nonverbal).
+It uses a finetune of [HF PlayHT/PlayDiffusion](https://huggingface.co/PlayHT/PlayDiffusion) available at [HF oezi13/PlayDiffusion-nonverbal](https://huggingface.co/oezi13/PlayDiffusion-nonverbal).
 
 This model was finetuned on [several non-verbal datasets such as DragonFox/Elise](https://huggingface.co/collections/oezi13/nonverbal-tts-audio-68ec1bee4163e50369424650) for 50 epochs/4 hours on a single RTX 3090. Current finetune supports `<laugh>`, `<breath>`, and `<pause>` in the input text. See [limitations below](#limitations--notes) for details.
 
@@ -132,8 +132,8 @@ This iterative decoding process continues until all steps are complete, graduall
 
 - PlayDiffusion transliterates input text using [Unidecode](https://pypi.org/project/Unidecode/) which strips accents and diacritics and maps non-Latin characters to their closest representation in ASCII alphabet. This can lead to mispronunciations for non-English names or words.
 - PlayDiffusion uses Jiwer to compare input and target text to determine which words to edit which includes punctuation to determine difference. For instance an extra comma in the output text will cause the preceding word to be marked for editing. Think: "Panda, eats, shoots, and leaves" vs. "Panda eats shoots and leaves".
-- PlayDiffusion uses a simple syllable estimator to determine the number of audio tokens to generate for a given text. This can lead to under- or over-generation of audio tokens for certain words.
-- PlayDiffusion uses a speaker embedding to condition the vocoder. For many voices, the vocoder can't produce laughter (it just sounds metallic).
+- PlayDiffusion uses a simple syllable estimator to determine the number of audio tokens to generate for a given text. This can lead to under- or over-generation of audio tokens for certain words. For the non-verbal finetune, non-verbal tags are currently set to take 3 syllables worth of audio tokens (~0.75 seconds) which may not be ideal for all cases.
+- PlayDiffusion uses a speaker embedding to condition the vocoder. For many voices (in particular women with high pitch), the vocoder can't produce laughter (it just sounds metallic).
 
 ## **Reference:**
 
