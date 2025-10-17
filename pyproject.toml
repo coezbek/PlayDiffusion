@@ -9,7 +9,7 @@ allow-direct-references = true
 name = "playdiffusion"
 version = "0.1.0"
 description = "Diffusion model for speech inpainting and TTS"
-requires-python = ">=3.11"
+requires-python = ">=3.11,<3.13"
 license = { text = "Apache-2.0" }
 dependencies = [
     "torch>=2.8.0",
@@ -47,3 +47,9 @@ demo = [
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/playdiffusion"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"demo/gradio-demo.py" = "src/playdiffusion/gradio_demo.py"
+
+[project.scripts]
+playdiffusion = "playdiffusion.gradio_demo:main"
