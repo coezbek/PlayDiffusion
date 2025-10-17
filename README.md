@@ -13,6 +13,7 @@ This model was finetuned on [several non-verbal datasets such as DragonFox/Elise
 Run the gradio demo via `uvx`:
 
 ```
+apt-get install ffmpeg libsndfile1
 uvx --python 3.12 playdiffusion@git+https://github.com/coezbek/PlayDiffusion
 ```
 
