@@ -237,5 +237,6 @@ def main():
     demo.launch(share=args.public)
 
 if __name__ == '__main__':
+    logger.info("Starting PlayDiffusion gradio demo...")
     main()
 
