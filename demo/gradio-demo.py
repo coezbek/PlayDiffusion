@@ -120,6 +120,7 @@ def main():
     parser.add_argument('--checkpoint', type=str, default=None, help='Path to the model checkpoint')
     args = parser.parse_args()
 
+    global inpainter
     if args.checkpoint:
         inpainter = PlayDiffusionConfigurable(config_path=args.checkpoint)
     else:
