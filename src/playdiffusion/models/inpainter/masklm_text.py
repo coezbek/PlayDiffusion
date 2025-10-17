@@ -430,6 +430,20 @@ class MaskGCT(nn.Module):
 
         return loss, output_dict
 
+    def save_checkpoint(self, save_path: str):
+        config = {
+            "vocab_size": self.vocab_text,
+            "codebook_size": self.vocab_audio,
+            "num_layers_lm": self.num_layers,
+            "num_heads": self.num_heads,
+            "num_kv_heads": self.num_kv_heads,
+            "hidden_size": self.dim,
+        }
+        checkpoint_data = {
+            'config': config,
+            'model': self.state_dict(),
+        }
+        torch.save(checkpoint_data, save_path)
 
 def load_maskgct_inpainter(checkpoint: str, device: str = 'cuda'):
     ckpt = torch.load(checkpoint)
