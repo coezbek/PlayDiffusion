@@ -6,7 +6,7 @@ This is a fork of [PlayDiffusion](https://github.com/PlayHT/playdiffusion) that 
 
 It uses a finetune of [HF PlayHT/PlayDiffusion](https://huggingface.co/PlayHT/PlayDiffusion) available at [HF oezi13/PlayDiffusion-nonverbal](https://huggingface.co/oezi13/PlayDiffusion-nonverbal).
 
-This model was finetuned on [several non-verbal datasets such as DragonFox/Elise](https://huggingface.co/collections/oezi13/nonverbal-tts-audio-68ec1bee4163e50369424650) for 50 epochs/4 hours on a single RTX 3090. Current finetune supports `<laugh>`, `<breath>`, and `<pause>` in the input text. See [limitations below](#limitations--notes) for details.
+This model was finetuned on [several non-verbal datasets such as DragonFox/Elise](https://huggingface.co/collections/oezi13/nonverbal-tts-audio-68ec1bee4163e50369424650) for 50 epochs/4 hours on a single RTX 3090. Current finetune supports `<laugh>`, `<breath>`, and `<pause>` in the input text (keep separated by spaces from other text). See [limitations below](#limitations--notes) for details.
 
 ## Installation
 
