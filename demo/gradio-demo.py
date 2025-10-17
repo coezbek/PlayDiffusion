@@ -110,8 +110,7 @@ def speech_rvc(rvc_source_speech, rvc_target_voice):
     return inpainter.rvc(RVCInput(source_speech=rvc_source_speech, target_voice=rvc_target_voice))
 
 
-
-if __name__ == '__main__':
+def main():
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--public', action='store_true', help='Share the demo publicly')
@@ -236,3 +235,7 @@ if __name__ == '__main__':
             )
 
     demo.launch(share=args.public)
+
+if __name__ == '__main__':
+    main()
+
