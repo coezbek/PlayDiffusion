@@ -1,17 +1,28 @@
-# PlayDiffusion
+# PlayDiffusion with Non-Verbal Tag Support
 
 https://github.com/user-attachments/assets/5b15f9d5-cb53-450f-84f6-5f7dda3e44e5
 
-[Blog Post](https://blog.play.ai/blog/play-diffusion)
+This is a fork of [PlayDiffusion](https://blog.play.ai/blog/play-diffusion) ([GitHub repo](https://github.com/PlayHT/playdiffusion)) that adds support for basic non-verbal tags.
+
+It uses a finetune of [HF PlayHT/PlayDiffusion](https://huggingface.co/PlayHT/PlayDiffusion) available at [oezi/](https://huggingface.co/coezbek/pd_nonverbal).
+
+This model was finetuned on [several non-verbal datasets such as DragonFox/Elise](https://huggingface.co/collections/oezi13/nonverbal-tts-audio-68ec1bee4163e50369424650) for 50 epochs/4 hours on a single RTX 3090. Current finetune supports `<laugh>`, `<breath>`, and `<pause>` in the input text. See [limitations below](#limitations--notes) for details.
 
 ## Installation
 
-Requires OPENAI_API_KEY env var for ASR and word timings--you can also use some other source for these.
+Run the gradio demo via `uvx`:
 
-1. Set up virtualenv: `python3.11 -m venv .venv` or `uv venv`
+```
+uvx --python 3.12 playdiffusion@git+https://github.com/coezbek/PlayDiffusion
+```
+
+To develop locally:
+
+1. Clone `git clone https://github.com/coezbek/PlayDiffusion`
+1. Set up virtualenv: `uv venv`
 2. Activate virutalenv: `source .venv/bin/activate`
-3. Install package and dependencies: `pip install '.[demo]'` or `uv sync --extra demo`
-4. Run demo: `python demo/gradio-demo.py` or `uv run demo/gradio-demo.py`
+3. Install package and dependencies: `uv sync`
+4. Run demo: `uv run demo/gradio-demo.py`
 
 ## Docker / Podman
 
@@ -117,10 +128,12 @@ During **inference**, decoding occurs iteratively, starting with a **fully maske
 
 This iterative decoding process continues until all steps are complete, gradually refining token predictions and resulting in coherent, high-quality audio outputs.
 
-## Limitations
+## Limitations / Notes
 
 - PlayDiffusion transliterates input text using [Unidecode](https://pypi.org/project/Unidecode/) which strips accents and diacritics and maps non-Latin characters to their closest representation in ASCII alphabet. This can lead to mispronunciations for non-English names or words.
 - PlayDiffusion uses Jiwer to compare input and target text to determine which words to edit which includes punctuation to determine difference. For instance an extra comma in the output text will cause the preceding word to be marked for editing. Think: "Panda, eats, shoots, and leaves" vs. "Panda eats shoots and leaves".
+- PlayDiffusion uses a simple syllable estimator to determine the number of audio tokens to generate for a given text. This can lead to under- or over-generation of audio tokens for certain words.
+- PlayDiffusion uses a speaker embedding to condition the vocoder. For many voices, the vocoder can't produce laughter (it just sounds metallic).
 
 ## **Reference:**
 
