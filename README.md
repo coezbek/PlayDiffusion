@@ -2,7 +2,7 @@
 
 https://github.com/user-attachments/assets/5b15f9d5-cb53-450f-84f6-5f7dda3e44e5
 
-This is a fork of [PlayDiffusion](https://blog.play.ai/blog/play-diffusion) ([GitHub repo](https://github.com/PlayHT/playdiffusion)) that adds support for basic non-verbal tags.
+This is a fork of [PlayDiffusion](https://github.com/PlayHT/playdiffusion) that adds support for basic non-verbal tags.
 
 It uses a finetune of [HF PlayHT/PlayDiffusion](https://huggingface.co/PlayHT/PlayDiffusion) available at [HF oezi13/PlayDiffusion-nonverbal](https://huggingface.co/oezi13/PlayDiffusion-nonverbal).
 
