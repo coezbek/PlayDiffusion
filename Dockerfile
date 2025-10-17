@@ -1,5 +1,5 @@
-# Use official Python 3.11 image
-FROM python:3.11-slim
+# Use official Python 3.11 image (can't upgrade to trixie, due to torio depending on ffmpeg6 not 7)
+FROM python:3.11-slim-bookworm
 
 # Set working directory
 WORKDIR /app
