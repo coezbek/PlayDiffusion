@@ -9,7 +9,10 @@ import whisper_timestamped as whisper
 import logging
 
 from playdiffusion.utils.config import PlayDiffusionConfigurable
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
+for name, logger in logging.Logger.manager.loggerDict.items():
+    if not name.startswith('playdiffusion'):
+        logger.disabled = True
 
 inpainter = None
 
@@ -237,6 +240,6 @@ def main():
     demo.launch(share=args.public)
 
 if __name__ == '__main__':
-    logger.info("Starting PlayDiffusion gradio demo...")
+    logging.getLogger('playdiffusion').info("Starting PlayDiffusion gradio demo...")
     main()
 
