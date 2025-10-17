@@ -7,9 +7,11 @@ from openai import OpenAI
 from playdiffusion import PlayDiffusion, InpaintInput, TTSInput, RVCInput
 import whisper_timestamped as whisper
 import logging
-logging.basicConfig(level=logging.DEBUG)
 
-inpainter = PlayDiffusion()
+from playdiffusion.utils.config import PlayDiffusionConfigurable
+logging.basicConfig(level=logging.INFO)
+
+inpainter = None
 
 def get_whisper_client(backend_choice,api_key):
     if backend_choice == "OpenAI Whisper API":
@@ -112,10 +114,14 @@ def speech_rvc(rvc_source_speech, rvc_target_voice):
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        '--public', action='store_true', help='Share the demo publicly'
-    )
+    parser.add_argument('--public', action='store_true', help='Share the demo publicly')
+    parser.add_argument('--checkpoint', type=str, default=None, help='Path to the model checkpoint')
     args = parser.parse_args()
+
+    if args.checkpoint:
+        inpainter = PlayDiffusionConfigurable(config_path=args.checkpoint)
+    else:
+        inpainter = PlayDiffusion()
 
     with gr.Blocks(analytics_enabled=False, title="PlayDiffusion") as demo:
         gr.Markdown("## PlayDiffusion")
@@ -155,8 +161,8 @@ if __name__ == '__main__':
 
             with gr.Row():
                 with gr.Column():
-                    text_input = gr.Textbox(label="Input text from ASR", interactive=False)
-                    text_output = gr.Textbox(label="Desired output text")
+                    text_input = gr.Textbox(label="Input text from ASR", interactive=False, lines=2)
+                    text_output = gr.Textbox(label="Desired output text", lines=2)
                 with gr.Column():
                     word_times = gr.JSON(label="Word times from ASR")
 
@@ -172,6 +178,12 @@ if __name__ == '__main__':
                     openai_api_key: gr.update(visible=(backend_choice == "OpenAI Whisper API"),interactive=(backend_choice == "OpenAI Whisper API")),
                     whisper_model: gr.update(visible=(backend_choice == "Local Whisper"),interactive=(backend_choice == "Local Whisper")),
                 }
+            
+            audio_input.change(
+                run_asr,
+                inputs=[audio_input, asr_backend, whisper_model,openai_api_key],
+                outputs=[text_input, text_output, word_times]
+            )
 
             asr_submit.click(
                 run_asr,
