@@ -206,9 +206,32 @@ class PlayDiffusion():
 
         return word_times_mod
 
-    def calculate_audio_token_syllable_ratio(self, word_times: List[Dict]):
-        import syllables
+    def syllables_estimate(self, input: str) -> int:
+        """
+        Estimates the number of syllables in an input string.
+        English-only!
 
+        Non-verbal tags (e.g. <laugh>, <breath>) are counted as 3 syllables (~0.75s)
+        Pause tags (<pause>) are counted as 1 syllable (~0.25s)
+        """
+        import syllables
+        import re
+        
+        re_nonverbal_tag = re.compile(r"<[^>]+>")
+        
+        sum = 0
+        for word in input.strip().split():            
+            if re_nonverbal_tag.match(word):
+                if word.lower() == "<pause>":
+                    sum += 1
+                else:
+                    sum += 3 # 0.75 second
+            else:
+                sum += syllables.estimate(word)
+
+        return sum
+
+    def calculate_audio_token_syllable_ratio(self, word_times: List[Dict]):
         speech_time = 0.0
         last_word_end = -self.break_spacing_time
         words_with_times = []
@@ -218,6 +241,7 @@ class PlayDiffusion():
                 or word.get("start") is None
                 or word.get("end") is None
             ):
+                logger.warning(f"Skipping word {i} ({word['word']}) with missing timestamps")
                 continue
             words_with_times.append(word["word"])
             if word["start"] - last_word_end < self.break_spacing_time:
@@ -226,7 +250,7 @@ class PlayDiffusion():
                 speech_time += word["end"] - word["start"] + self.break_spacing_time
             last_word_end = word["end"]
         logger.debug(f"Speech time: {speech_time:.2f} s")
-        n_syllables = syllables.estimate(" ".join(words_with_times))
+        n_syllables = self.syllables_estimate(" ".join(words_with_times))
         logger.debug(f"Number of syllables: {n_syllables}")
         if n_syllables == 0:
             audio_token_syllable_ratio = self.default_audio_token_syllable_ratio
@@ -548,7 +572,7 @@ class PlayDiffusion():
             logger.debug(f"Text to submit: {text_to_submit}")
 
             # determine number of phonemes and estimate number of frames for the output
-            n_syllables = syllables.estimate(" ".join(hyp_text))
+            n_syllables = self.syllables_estimate(" ".join(hyp_text))
             logger.debug(f"Hyp syllables: {n_syllables}")
             n_frames = int(n_syllables * audio_token_syllable_ratio) # 4 syllables/sec
             logger.debug(f"N frames: {n_frames}")
@@ -576,7 +600,7 @@ class PlayDiffusion():
                         sub_end_frame = None
                         sub_buf_start_frame = None
                         sub_buf_end_frame = None
-                    n_syllables = syllables.estimate(hyp_text)
+                    n_syllables = self.syllables_estimate(hyp_text)
                     n_frames = int(n_syllables * audio_token_syllable_ratio)
                     sub_text_to_submit = " ".join(sub_words[i])
                     sub_text_tokens = self.mm.tokenizer.encode_normalized_to_tensor(
@@ -825,7 +849,6 @@ class PlayDiffusion():
         return self.do_split(text)
 
     def tts(self, input: TTSInput):
-        import syllables
         import torch
         from unidecode import unidecode
 
@@ -854,7 +877,7 @@ class PlayDiffusion():
 
                 # estimate the number of frames for the TTS result
                 ratio = input.audio_token_syllable_ratio or self.default_audio_token_syllable_ratio
-                n_syllables = syllables.estimate(text)
+                n_syllables = self.syllables_estimate(text)
                 target_len = int(n_syllables * ratio)
                 self.timer("Estimate frames")
 
